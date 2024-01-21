@@ -299,6 +299,7 @@ func waitForAuthEmails(mailClient onesecmail.Client, acc *AtlasAccount) {
 			return
 		}
 		fmt.Printf("%s\n", code)
+		go mailClient.ClearMailbox(acc.MailAddr)
 	}
 }
 
