@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -303,42 +305,68 @@ func waitForAuthEmails(mailClient onesecmail.Client, acc *AtlasAccount) {
 	}
 }
 
-func main() {
+func saveAccToFile(path, mail, onesecmailurl string) error {
 
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.FileMode(0700))
+	if err != nil {
+		return err
+	}
+	msg := fmt.Sprintf("Creation date: %s\nEmail address: %s\nLink to mailbox: %s\n\n", time.Now().Format("2006-01-02 15:04:05 UTC-0700"), mail, onesecmailurl)
+	file.Write([]byte(msg))
+	return nil
+}
+
+func main() {
 	startTime := time.Now()
 	cl := &http.Client{}
 	client := onesecmail.NewClient()
 
-	fmt.Print("[i] Creating account...\n")
+	fmt.Print("[i] Creating account... ")
 	t := time.Now()
 	acc, err := generateAtlasVPNAccount("", client, cl, nil)
 	if checkErr(err) {
 		return
 	}
-	fmt.Printf("[i] Created account in %s, fetching uuid...\n", time.Since(t).String())
+	fmt.Printf("Done in %s\n[i] Fetching uuid... ", time.Since(t).String())
 	t = time.Now()
 	uuid, err := acc.fetchUuid(cl)
 	if checkErr(err) {
 		return
 	}
-	fmt.Printf("[i] Fetched uuid in %s, starting creating accounts...\n", time.Since(t).String())
+	fmt.Printf("Done in %s\n", time.Since(t).String())
 	i := 0
 	tunnel := make(chan bool)
 	for i < 10 {
 		go generateAtlasVPNAccount(uuid, client, cl, tunnel)
 		i++
 	}
-	fmt.Printf("[i] Waiting for accounts to create...\n")
+	fmt.Printf("[i] Creating several more accounts... ")
+	t = time.Now()
 	i = 0
 	for i < 10 {
 		<-tunnel
 		i++
 	}
+	fmt.Printf("Done in %s\n", time.Since(t).String())
 	parts := strings.Split(acc.MailAddr, "@")
-	fmt.Printf("\n[i] Your account email addres: %s\n", acc.MailAddr)
+	oneSecMail := fmt.Sprintf("https://www.1secmail.com/?login=%s&domain=%s\n", parts[0], parts[1])
+	fmt.Printf("\n[i] Registration took %s\n", time.Since(startTime))
+	fmt.Print("[i] Saving account data to file ")
+	ex, err := os.Executable()
+	if err == nil {
+		logsPath := filepath.Clean(filepath.Dir(ex) + "/logs.txt")
+		fmt.Printf("%s...", logsPath)
+		err = saveAccToFile(logsPath, acc.MailAddr, oneSecMail)
+		if err == nil {
+			fmt.Print(" Success!")
+		} else {
+			fmt.Print(" Failed")
+		}
+	}
 
-	fmt.Printf("[i] Registration took %s\n", time.Since(startTime).String())
-	fmt.Printf("[i] To check mailbox/login next time go to https://www.1secmail.com/?login=%s&domain=%s\n", parts[0], parts[1])
+	fmt.Print("\n")
+	fmt.Printf("[i] Your account email addres: %s\n", acc.MailAddr)
+	fmt.Printf("[i] To check mailbox/login next time go to %s", oneSecMail)
 
 	fmt.Printf("[i] Go to AtlasVpn app and enter e-mail, then the link will be printed here or just quit this app\n")
 	waitForAuthEmails(*client, &acc)
