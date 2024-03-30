@@ -1,3 +1,5 @@
+## ❗UPDATE   
+> Due to fact that [Atlas VPN is closing on April 24, 2023](https://atlasvpn.com/blog/announcement), it is no longer possible to get premium days by inviting people
 # AtlasVPN accounts generator
 ## Purpose
 
